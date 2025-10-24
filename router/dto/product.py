@@ -11,6 +11,7 @@ class Product(BaseModel):
     first_stock: int
     unit_price: float
     available_stock: int
+    image_url: Optional[str] = None
     status: str = "active"
 
 
@@ -21,6 +22,7 @@ class ProductCreate(BaseModel):
     first_stock: int
     unit_price: float
     available_stock: int
+    image_url: Optional[str] = None
     status: str = "active"
 
 
@@ -30,6 +32,7 @@ class ProductUpdate(BaseModel):
     unit_price: Optional[float] = None
     description: Optional[str] = None
     available_stock: Optional[int] = None
+    image_url: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -45,6 +48,7 @@ class ProductResponse(BaseModel):
     first_stock: Optional[int] = None
     unit_price: Optional[float] = None
     available_stock: Optional[int] = None
+    image_url: Optional[str] = None
     created_at: Optional[datetime] = Field(None, alias="created_at")
     updated_at: Optional[datetime] = Field(None, alias="updated_at")
     status: Optional[str] = None

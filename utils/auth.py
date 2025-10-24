@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from fastapi import  HTTPException, status, Depends
-from typing import Optional, Set
+from typing import Optional, Set, Callable, List
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from jose import jwt, JWTError
@@ -51,5 +51,19 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     # Remove password before returning
+    user['roles'] = user.get('roles', ['user'])
     user.pop('password', None)
     return user
+
+def require_roles(allowed: List[str]) -> Callable:
+    """
+    Dependency untuk membatasi akses berdasarkan roles.
+    Usage:
+      def handler(..., _=Depends(require_roles(['admin']))): ...
+    """
+    def _dep(current_user: dict = Depends(get_current_user)):
+        roles = current_user.get('roles') or []
+        if not any(r in roles for r in allowed):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+        return current_user
+    return _dep
