@@ -1,18 +1,11 @@
 import os
 import uuid
 import logging
+import re
 from fastapi import APIRouter, Query, HTTPException, status, Depends, UploadFile, File
 from router import router_param_builder
-from utils.auth import (
-    create_access_token,
-    get_current_user,
-    get_password_hash,
-    verify_password,
-    oauth2_scheme,
-    token_blacklist,
-    require_roles
-)
-from utils.helper import ensure_exists
+from utils.auth import get_current_user, require_roles
+from utils.helper import ensure_exists, _is_admin
 from router.dto.user import (
     UserRegister,
     UserRegisterResponse,
@@ -49,11 +42,16 @@ def get_all_users(
 ):
     query = {}
     if filters.name:
-        query["name"] = filters.name
+        pattern = re.escape(filters.name)
+        query["name"] = {"$regex": pattern, "$options": "i"}
     if filters.email:
-        query["email"] = filters.email.strip().lower()
+        query["email"] = filters.email
+    if filters.phone:
+        query["phone"] = filters.phone
     if filters.status:
         query["status"] = filters.status
+    if filters.roles:
+        query["roles"] = {"$in": filters.roles}
 
     total_data = mongo_service.count_documents("users", query)
     paging = pagination.get_paging(str(page), str(size))
@@ -66,13 +64,13 @@ def get_all_users(
     return {"data": user_items, "pagination_info": paging_info}
 
 
-@router.get("/api/v1/users/{user_id}")
+@router.get("/api/v1/{user_id}")
 def get_user_by_id(user_id: str):
     user = mongo_service.find_one("users", {"user_id": user_id})
     return ensure_exists(user, "User")
 
 
-@router.put("/api/v1/users/{user_id}")
+@router.put("/api/v1/{user_id}")
 def update_user(user_id: str, payload: UserUpdate):
     update = {k: v for k, v in payload.dict().items() if v is not None}
     if not update:
@@ -88,7 +86,7 @@ def update_user(user_id: str, payload: UserUpdate):
     return user
 
 
-@router.delete("/api/v1/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/v1/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: str, _=Depends(require_roles(["admin"]))):
     # Bersihkan avatar file jika ada
     user = mongo_service.find_one("users", {"user_id": user_id})
@@ -113,84 +111,7 @@ def delete_user(user_id: str, _=Depends(require_roles(["admin"]))):
     return None
 
 
-@router.post(
-    "/api/v1/auth/register",
-    status_code=status.HTTP_201_CREATED,
-    response_model=UserRegisterResponse,
-)
-def register(payload: UserRegister):
-
-    email = payload.email.strip().lower()
-    existing = mongo_service.find_one("users", {"email": email})
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
-        )
-    roles = payload.roles if payload.roles else ['user']
-    if roles:
-        roles = sorted({r.strip().lower() for r in roles if r and r.strip()})
-        roles = list(roles) if roles else ['user']
-    user_doc = {
-        "user_id": str(uuid.uuid4()),
-        "name": payload.name.strip(),
-        "email": email,
-        "phone": payload.phone.strip() if payload.phone else None,
-        "status": payload.status,
-        "roles": roles,
-        "password": get_password_hash(payload.password),
-    }
-    try:
-        mongo_service.insert_one("users", user_doc)
-    except DuplicateKeyError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Duplicate key error while registering user",
-        ) from e
-    except PyMongoError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error while registering user",
-        ) from e
-    return {"status": status.HTTP_201_CREATED, "data": user_doc}
-
-
-@router.post("/api/v1/auth/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    email = form_data.username.strip().lower()
-    logger.info(f"Attempting login for email: {email}")
-    user = mongo_service.find_one("users", {"email": email})
-    logger.info(f"User result: {'found' if user else 'not found'}")
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-    if not verify_password(form_data.password, user.get("password", "")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password",
-        )
-    roles = user.get("roles") or ["user"]
-    access_token = create_access_token({"sub": user["user_id"], "roles": roles})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-
-@router.get("/api/v1/auth/me")
-def me(current_user: dict = Depends(get_current_user)):
-    return current_user
-
-
-@router.post("/api/v1/auth/logout")
-def logout(token: str = Depends(oauth2_scheme)):
-    # Add token to blacklist (demo). For production, consider short TTLs or server-side sessions.
-    token_blacklist.add(token)
-    return {"message": "Logged out"}
-
-def _is_admin(u: dict) -> bool:
-    roles = u.get("roles") or []
-    return "admin" in roles
-
-@router.post("/api/v1/users/{user_id}/avatar")
+@router.post("/api/v1/{user_id}/avatar")
 async def upload_avatar(
     user_id: str,
     file: UploadFile = File(...),
@@ -223,8 +144,14 @@ async def upload_avatar(
     if old_url and old_url.startswith("/static/avatars/"):
         try:
             old_path = Path(old_url.lstrip("/"))
-            if old_path.is_file() and old_path.resolve().is_file() and AVATAR_DIR.resolve() in old_path.resolve().parents:
-                old_path.unlink(missing_ok=True)  # Python 3.8+: use try/except if missing_ok unsupported
+            if (
+                old_path.is_file()
+                and old_path.resolve().is_file()
+                and AVATAR_DIR.resolve() in old_path.resolve().parents
+            ):
+                old_path.unlink(
+                    missing_ok=True
+                )  # Python 3.8+: use try/except if missing_ok unsupported
         except Exception:
             pass
 
@@ -233,7 +160,8 @@ async def upload_avatar(
 
     return {"avatar_url": avatar_url}
 
-@router.delete("/api/v1/users/{user_id}/avatar", status_code=status.HTTP_204_NO_CONTENT)
+
+@router.delete("/api/v1/{user_id}/avatar", status_code=status.HTTP_204_NO_CONTENT)
 def delete_avatar(
     user_id: str,
     current_user: dict = Depends(get_current_user),

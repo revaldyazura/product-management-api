@@ -26,7 +26,8 @@ from utils.logging_config import setup_logging
 
 CONTROLLER_MODULES = {
     "product": "product_controller",
-    "user": "user_controller"
+    "user": "user_controller",
+    "auth": "auth_controller",
 }
 setup_logging()
 logger = logging.getLogger(__name__)

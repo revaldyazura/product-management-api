@@ -1,4 +1,5 @@
 from datetime import datetime
+from fastapi import Query
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -8,9 +9,9 @@ class Product(BaseModel):
     name: str
     category: str
     description: str
-    first_stock: int
+    stock: int
     unit_price: float
-    available_stock: int
+    low_stock: int
     image_url: Optional[str] = None
     status: str = "active"
 
@@ -19,9 +20,9 @@ class ProductCreate(BaseModel):
     name: str
     category: str
     description: str
-    first_stock: int
+    stock: int
     unit_price: float
-    available_stock: int
+    low_stock: int
     image_url: Optional[str] = None
     status: str = "active"
 
@@ -31,23 +32,26 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     unit_price: Optional[float] = None
     description: Optional[str] = None
-    available_stock: Optional[int] = None
-    image_url: Optional[str] = None
+    low_stock: Optional[int] = None
     status: Optional[str] = None
 
 
-class ProductFilters(BaseModel):
-    name: Optional[str] = None
 
+class ProductFilters:
+    def __init__(
+        self,
+        name: Optional[str] = Query(None),
+    ):
+        self.name = name
 
 class ProductResponse(BaseModel):
     product_id: Optional[str] = None
     name: Optional[str] = None
     category: Optional[str] = None
     description: Optional[str] = None
-    first_stock: Optional[int] = None
+    stock: Optional[int] = None
     unit_price: Optional[float] = None
-    available_stock: Optional[int] = None
+    low_stock: Optional[int] = None
     image_url: Optional[str] = None
     created_at: Optional[datetime] = Field(None, alias="created_at")
     updated_at: Optional[datetime] = Field(None, alias="updated_at")

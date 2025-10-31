@@ -11,7 +11,7 @@ from settings import settings
 
 # Auth setup
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/controller/api/v1/auth/login")
 JWT_SECRET = settings.jwt_secret_key or "dev-secret-change-me"
 JWT_ALG = settings.jwt_algorithm
 ACCESS_EXPIRE_MINUTES = int(settings.access_token_expire_minutes)

@@ -1,6 +1,7 @@
 import os
 import uuid
 import secrets
+import re
 from fastapi import (
     APIRouter,
     Query,
@@ -46,7 +47,8 @@ def get_all_products(
 ):
     query = {}
     if filters.name:
-        query["name"] = filters.name
+        pattern = re.escape(filters.name)
+        query["name"] = {"$regex": pattern, "$options": "i"}
 
     total_data = mongo_service.count_documents("inventory", query)
     paging = pagination.get_paging(str(page), str(size))
@@ -60,10 +62,10 @@ def get_all_products(
     return {"data": product_items, "pagination_info": paging_info}
 
 
-@router.get("/api/v1/products/{product_id}")
-def get_product_by_id(product_id: str):
-    product = mongo_service.find_one("inventory", {"product_id": product_id})
-    return ensure_exists(product, "Product")
+# @router.get("/api/v1/products/{product_id}")
+# def get_product_by_id(product_id: str):
+#     product = mongo_service.find_one("inventory", {"product_id": product_id})
+#     return ensure_exists(product, "Product")
 
 
 @router.post(
@@ -107,7 +109,7 @@ def create_products(products: List[ProductCreate] = Body(..., min_items=1)):
     return {"status": status.HTTP_201_CREATED, "data": product_docs}
 
 
-@router.put("/api/v1/products/{product_id}")
+@router.put("/api/v1/{product_id}")
 def update_product(product_id: str, payload: ProductUpdate):
     update = {k: v for k, v in payload.dict().items() if v is not None}
     if not update:
@@ -122,7 +124,7 @@ def update_product(product_id: str, payload: ProductUpdate):
     product = mongo_service.find_one("inventory", {"product_id": product_id})
     return product
 
-@router.delete("/api/v1/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/v1/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(product_id: str, _=Depends(require_roles(["admin"]))):
     # Hapus file image jika ada sebelum delete dokumen
     product = mongo_service.find_one("inventory", {"product_id": product_id})
@@ -146,7 +148,7 @@ def delete_product(product_id: str, _=Depends(require_roles(["admin"]))):
         )
     return None
 
-@router.post("/api/v1/products/{product_id}/image")
+@router.post("/api/v1/{product_id}/image")
 async def upload_product_image(
     product_id: str,
     file: UploadFile = File(...),
@@ -187,7 +189,7 @@ async def upload_product_image(
     mongo_service.update_one("inventory", {"product_id": product_id}, {"image_url": image_url})
     return {"image_url": image_url}
 
-@router.delete("/api/v1/products/{product_id}/image", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/api/v1/{product_id}/image", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product_image(
     product_id: str,
     _=Depends(require_roles(["admin"])),

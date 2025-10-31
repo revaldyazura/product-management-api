@@ -1,6 +1,8 @@
 from datetime import datetime
+from fastapi import Query
 from pydantic import BaseModel, Field
 from typing import Optional, List
+
 
 class User(BaseModel):
     user_id: Optional[str] = None
@@ -10,7 +12,7 @@ class User(BaseModel):
     avatar_url: Optional[str] = None
     created_at: Optional[str] = None
     status: Optional[str] = "active"
-    roles: List[str] = Field(default_factory=lambda: ['user'])
+    roles: List[str] = Field(default_factory=lambda: ["user"])
 
 
 class UserCreate(BaseModel):
@@ -38,16 +40,24 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = None
-    avatar_url: Optional[str] = None
     roles: Optional[List[str]] = None
 
 
-class UserFilters(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    status: Optional[str] = None
-    roles: Optional[List[str]] = None
+class UserFilters:
+    def __init__(
+        self,
+        name: Optional[str] = Query(None),
+        email: Optional[str] = Query(None),
+        phone: Optional[str] = Query(None),
+        status: Optional[str] = Query(None),
+        roles: Optional[List[str]] = Query(None),
+    ):
+        self.name = name
+        self.email = email.strip().lower() if email else None
+        self.phone = phone
+        self.status = status
+        self.roles = roles
+
 
 class UserResponse(BaseModel):
     user_id: Optional[str] = None
@@ -59,11 +69,13 @@ class UserResponse(BaseModel):
     updated_at: Optional[datetime] = Field(None, alias="updated_at")
     status: Optional[str] = None
     roles: Optional[List[str]] = None
-    
+
+
 class UsersListResponse(BaseModel):
     data: List[UserResponse]
     pagination_info: dict
-    
+
+
 class UserRegisterResponse(BaseModel):
     data: UserResponse
     status: int
