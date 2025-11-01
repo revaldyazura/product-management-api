@@ -34,6 +34,7 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     low_stock: Optional[int] = None
     status: Optional[str] = None
+    stock: Optional[int] = None
 
 
 
