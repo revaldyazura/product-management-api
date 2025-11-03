@@ -21,6 +21,7 @@ from utils.auth import require_roles
 from router.dto.product import (
     ProductBulkCreate,
     ProductCreate,
+    ProductResponse,
     ProductUpdate,
     ProductFilters,
     ProductsListResponse,
@@ -49,6 +50,8 @@ def get_all_products(
     if filters.name:
         pattern = re.escape(filters.name)
         query["name"] = {"$regex": pattern, "$options": "i"}
+    if filters.status:
+        query["status"] = filters.status 
 
     total_data = mongo_service.count_documents("inventory", query)
     paging = pagination.get_paging(str(page), str(size))
@@ -62,10 +65,10 @@ def get_all_products(
     return {"data": product_items, "pagination_info": paging_info}
 
 
-# @router.get("/api/v1/products/{product_id}")
-# def get_product_by_id(product_id: str):
-#     product = mongo_service.find_one("inventory", {"product_id": product_id})
-#     return ensure_exists(product, "Product")
+@router.get("/api/v1/{product_id}", response_model=ProductResponse)
+def get_product_by_id(product_id: str):
+    product = mongo_service.find_one("inventory", {"product_id": product_id})
+    return ensure_exists(product, "Product")
 
 
 @router.post(

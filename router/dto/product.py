@@ -42,8 +42,10 @@ class ProductFilters:
     def __init__(
         self,
         name: Optional[str] = Query(None),
+        status: Optional[str] = Query(None),
     ):
         self.name = name
+        self.status = status
 
 class ProductResponse(BaseModel):
     product_id: Optional[str] = None
